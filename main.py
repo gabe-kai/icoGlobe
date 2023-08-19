@@ -1,25 +1,25 @@
 import pygame
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
-from icosphere import project, Icosphere
+from icosphere import Icosphere
 from ui_classes import Button, DebugMenu
 
 
 # Function to draw labels attached to specified vertices
-def draw_labels(local_screen, local_vertices):
+def draw_labels(local_screen, local_vertices, globe):
     # Define the indices for the North and South Pole vertices
     north_pole_index = 1
     south_pole_index = 2
 
     # Project the poles onto the screen
-    north_pole_2d = project(local_vertices[north_pole_index])
-    south_pole_2d = project(local_vertices[south_pole_index])
+    north_pole_2d = globe.project(local_vertices[north_pole_index])
+    south_pole_2d = globe.project(local_vertices[south_pole_index])
 
     # Fonts for specific labels
     pole_font = pygame.font.Font(None, 36)
 
     # Render the labels
-    north_label = pole_font.render("N", True, (255, 255, 255))
-    south_label = pole_font.render("S", True, (255, 255, 255))
+    north_label = pole_font.render("N", True, (255, 64, 64))
+    south_label = pole_font.render("S", True, (255, 64, 64))
 
     # Label offset to keep the label a bit away from the vertex
     offset = 10
@@ -36,7 +36,7 @@ def main():
     # Set up the display & create an instance of the Icosphere.
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption('Icosphere Map')
-    globe = Icosphere('Tiny')
+    globe = Icosphere('Small')
 
     # Variables for user-interactions
     # Mouse Dragging
@@ -71,6 +71,12 @@ def main():
                 if debug_menu.is_visible:
                     debug_menu.handle_event(event, globe)
 
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 4:  # Mouse wheel up
+                    globe.zoom_in()
+                elif event.button == 5:  # Mouse wheel down
+                    globe.zoom_out()
+
             if event.type == pygame.MOUSEBUTTONUP:
                 dragging = False
                 dragging_inside_debug_menu = False
@@ -89,11 +95,11 @@ def main():
         if globe.need_redraw:
             screen.fill((64, 64, 64))  # Fill the screen with a dark gray background
             globe.draw(screen)  # Call the function to draw the icomap
-            draw_labels(screen, globe.vertices)  # Call the function to draw the labels
+            draw_labels(screen, globe.vertices, globe)  # Call the function to draw the labels
+            globe.need_redraw = False  # Reset the redraw flag.
             debug_button.draw(screen)
             debug_menu.draw(screen, globe)
             pygame.display.flip()  # Update the full display Surface to the screen
-            globe.need_redraw = False  # Reset the redraw flag.
 
     pygame.quit()
 

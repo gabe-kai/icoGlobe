@@ -8,7 +8,7 @@ class Button:
         self.menu = menu
 
     def draw(self, screen):
-        pygame.draw.rect(screen, (255, 255, 255), self.rect, 1)
+        pygame.draw.rect(screen, (128, 128, 128), self.rect)
         font = pygame.font.Font('assets/fonts/Urbanist-Bold.ttf', 20)
 
         label = font.render(self.text, 1, (255, 255, 255))
@@ -64,7 +64,7 @@ class DebugMenu:
                     "Map Size: {}".format(globe.mapsize),
                     "Vertices: {}".format(globe.vertices_count),
                     "Faces: {}".format(globe.faces_count),
-                    "Zoom: {}".format(globe.zoom_level)
+                    "Zoom: {:.2f}".format(globe.normalized_scale)
                 ]
                 self.scroll_area.draw(screen)
 

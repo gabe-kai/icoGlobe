@@ -6,45 +6,9 @@ from config import SCREEN_WIDTH, SCREEN_HEIGHT, SCALE
 # Constants for centering the icosahedron on the screen
 OFFSET_X = SCREEN_WIDTH // 2
 OFFSET_Y = SCREEN_HEIGHT // 2
-
-
-# Project the 3d vertex onto 2d using orthographic projection
-def project(vertex):
-    """
-    Project a 3D vertex onto 2D using orthographic projection.
-
-    Args:
-        vertex (tuple): The 3D vertex.
-
-    Returns:
-        tuple: The 2D projection.
-    """
-    x = vertex[0] * SCALE + OFFSET_X
-    y = -vertex[1] * SCALE + OFFSET_Y  # We invert the y-axis because Pygame's y-axis points downward
-    return int(x), int(y)
-
-
-# Function to rotate the icosphere around the z-axis (z is depth, in-to and out-of the screen)
-# This is only used to initially change the rotation of the planet so the poles are at the top and bottom.
-def rotate_vertices_z(verts: np.ndarray, theta_z: float) -> np.ndarray:
-    """
-    Rotate the vertices around the z-axis.
-
-    Args:
-        verts (list): List of vertices.
-        theta_z (float): Rotation angle.
-
-    Returns:
-        numpy.ndarray: Rotated vertices.
-    """
-    # Z-axis rotation
-    rotation_matrix_z = np.array([
-        [np.cos(theta_z), -np.sin(theta_z), 0],
-        [np.sin(theta_z), np.cos(theta_z), 0],
-        [0, 0, 1]
-    ])
-
-    return np.dot(verts, rotation_matrix_z)
+ZOOM_FACTOR = 1.1  # 10% zoom per mouse wheel movement
+MIN_SCALE = 350
+MAX_SCALE = 16000
 
 
 class Icosphere:
@@ -114,14 +78,14 @@ class Icosphere:
 
         # Initial rotation to align the poles
         initial_theta_z = -np.pi / 6  # rotate by 30 degrees
-        self.vertices = rotate_vertices_z(self.vertices, initial_theta_z)
+        self.vertices = self.rotate_vertices_z(self.vertices, initial_theta_z)
 
         # Subdivision iterations
         self._subdivide(Icosphere.ITERATIONS[iteration_name])
         self._mapsize = iteration_name
 
         # Zoom level
-        self._zoom_level = 1.0
+        self.scale = SCALE
 
     # Function to find the midpoints
     @staticmethod
@@ -165,6 +129,43 @@ class Icosphere:
             for i in range(len(self.vertices)):
                 self.vertices[i] = self.vertices[i] / np.linalg.norm(self.vertices[i])
 
+    def project(self, vertex):
+        """
+        Project a 3D vertex onto 2D using orthographic projection.
+
+        Args:
+            vertex (tuple): The 3D vertex.
+
+        Returns:
+            tuple: The 2D projection.
+        """
+        x = vertex[0] * self.scale + OFFSET_X
+        y = -vertex[1] * self.scale + OFFSET_Y  # We invert the y-axis because Pygame's y-axis points downward
+        return int(x), int(y)
+
+    # Function to rotate the icosphere around the z-axis (z is depth, in-to and out-of the screen)
+    # This is only used to initially change the rotation of the planet so the poles are at the top and bottom.
+    @staticmethod
+    def rotate_vertices_z(verts: np.ndarray, theta_z: float) -> np.ndarray:
+        """
+        Rotate the vertices around the z-axis.
+
+        Args:
+            verts (list): List of vertices.
+            theta_z (float): Rotation angle.
+
+        Returns:
+            numpy.ndarray: Rotated vertices.
+        """
+        # Z-axis rotation
+        rotation_matrix_z = np.array([
+            [np.cos(theta_z), -np.sin(theta_z), 0],
+            [np.sin(theta_z), np.cos(theta_z), 0],
+            [0, 0, 1]
+        ])
+
+        return np.dot(verts, rotation_matrix_z)
+
     # Function to free rotate the icosphere around its polar axis, and to tilt it back and forth
     # We'll lock the tilting later to prevent anyone from flipping the planet upside down.
     def rotate_vertices(self, loc_theta_y, loc_theta_x):
@@ -201,10 +202,12 @@ class Icosphere:
             screen (pygame.Surface): The surface on which the icosphere should be drawn.
         """
         for face in self.faces:
-            v1 = project(self.vertices[face[0]])
-            v2 = project(self.vertices[face[1]])
-            v3 = project(self.vertices[face[2]])
-            pygame.draw.polygon(screen, (255, 255, 255), [v1, v2, v3], 1)
+            # Check if all vertices of the face are in front of the centerpoint of the sphere.
+            if all(self.vertices[face[i]][2] > 0 for i in range(3)):
+                v1 = self.project(self.vertices[face[0]])
+                v2 = self.project(self.vertices[face[1]])
+                v3 = self.project(self.vertices[face[2]])
+                pygame.draw.polygon(screen, (255, 255, 255), [v1, v2, v3], 1)
 
     def handle_mouse_motion(self, dx, dy, rotation_speed):
         """
@@ -228,6 +231,26 @@ class Icosphere:
 
         self.need_redraw = True  # Indicate that a redraw of the screen is needed, as it has been rotated.
 
+    def zoom_in(self):
+        if self.scale * ZOOM_FACTOR <= MAX_SCALE:
+            self.scale *= ZOOM_FACTOR
+            self.need_redraw = True
+
+    def zoom_out(self):
+        if self.scale / ZOOM_FACTOR >= MIN_SCALE:
+            self.scale /= ZOOM_FACTOR
+            self.need_redraw = True
+
+    @property
+    def normalized_scale(self):
+        conversion_factor = 1 / MIN_SCALE
+        return self.scale * conversion_factor
+
+    @normalized_scale.setter
+    def normalized_scale(self, value):
+        self.scale = value * MIN_SCALE
+        self.need_redraw = True  # Indicate that a redraw is needed due to scale change.
+
     # Property to get the count of vertices
     @property
     def vertices_count(self):
@@ -241,7 +264,7 @@ class Icosphere:
     # Property to get the current zoom level
     @property
     def zoom_level(self):
-        return self._zoom_level
+        return self.scale
 
     # Property to get the current map size
     @property
@@ -253,5 +276,5 @@ class Icosphere:
     def zoom_level(self, value):
         # Here, you can include logic to check if the value is within an acceptable range or make any other
         # necessary adjustments.
-        self._zoom_level = value
+        self.scale = value
         self.need_redraw = True  # Indicate that a redraw is needed due to zoom level change.
