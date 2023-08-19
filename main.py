@@ -59,7 +59,7 @@ def main():
             # Mouse event handling for rotation
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if debug_button.rect.collidepoint(event.pos):
-                    # Check if hte Debug menu was clicked, and handle it.
+                    # Check if the Debug menu was clicked, and handle it.
                     debug_button.handle_event(event, globe)
                 elif debug_menu.rect.collidepoint(event.pos):
                     dragging_inside_debug_menu = True

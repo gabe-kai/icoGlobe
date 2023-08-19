@@ -1,6 +1,6 @@
 import pygame
 import numpy as np
-from config import SCREEN_WIDTH, SCREEN_HEIGHT, SCALE
+from config import SCREEN_WIDTH, SCREEN_HEIGHT
 
 
 # Constants for centering the icosahedron on the screen
@@ -8,10 +8,11 @@ OFFSET_X = SCREEN_WIDTH // 2
 OFFSET_Y = SCREEN_HEIGHT // 2
 ZOOM_FACTOR = 1.1  # 10% zoom per mouse wheel movement
 MIN_SCALE = 350
-MAX_SCALE = 16000
 
 
 class Icosphere:
+    MAX_SCALE = None  # Will be dynamically set later
+
     # Define the vertices for an icosahedron
     phi = (1.0 + np.sqrt(5.0)) / 2.0
     vertices = np.array([
@@ -82,10 +83,10 @@ class Icosphere:
 
         # Subdivision iterations
         self._subdivide(Icosphere.ITERATIONS[iteration_name])
+        self.scale = MIN_SCALE
+        self._calculate_max_scale()
+        self._set_initial_zoom_level()
         self._mapsize = iteration_name
-
-        # Zoom level
-        self.scale = SCALE
 
     # Function to find the midpoints
     @staticmethod
@@ -193,6 +194,28 @@ class Icosphere:
         self.vertices = np.dot(self.vertices, rotation_matrix_y)
         self.vertices = np.dot(self.vertices, rotation_matrix_x)
 
+    def _calculate_max_scale(self):
+        # Find the maximum distance between two vertices of the same face
+        max_dist = 0
+        for face in self.faces:
+            a, b, c = self.vertices[face[0]], self.vertices[face[1]], self.vertices[face[2]]
+            max_dist = max(max_dist, np.linalg.norm(a - b), np.linalg.norm(b - c), np.linalg.norm(c - a))
+
+            # Set MAX_SCALE such that this distance fills the screen height
+            Icosphere.MAX_SCALE = SCREEN_HEIGHT / max_dist
+
+    def _set_initial_zoom_level(self):
+        # Start completely zoomed out
+        self.scale = MIN_SCALE
+
+        while self.drawn_faces_count > 300:
+            # Increase zoom level (decrease the number of visible faces)
+            self.scale *= 1.1  # Increase scale by 10%
+
+            # Break out if we reach max, to avoid infinite loops
+            if self.scale >= Icosphere.MAX_SCALE:
+                break
+
     # Function to draw the icosphere
     def draw(self, screen):
         """
@@ -207,7 +230,11 @@ class Icosphere:
                 v1 = self.project(self.vertices[face[0]])
                 v2 = self.project(self.vertices[face[1]])
                 v3 = self.project(self.vertices[face[2]])
-                pygame.draw.polygon(screen, (255, 255, 255), [v1, v2, v3], 1)
+
+                # Check if any of the vertices are within the screen bounds
+                if (any(0 <= vertex[0] <= SCREEN_WIDTH for vertex in [v1, v2, v3]) and
+                        any(0 <= vertex[1] <= SCREEN_HEIGHT for vertex in [v1, v2, v3])):
+                    pygame.draw.polygon(screen, (255, 255, 255), [v1, v2, v3], 1)
 
     def handle_mouse_motion(self, dx, dy, rotation_speed):
         """
@@ -218,8 +245,10 @@ class Icosphere:
             dy (float): Change in y-position of the mouse.
             rotation_speed (float): Speed at which the icosphere should rotate.
         """
-        theta_y = rotation_speed * dx
-        theta_x = rotation_speed * dy
+        zoom_scaling = self.normalized_scale
+
+        theta_y = (-rotation_speed * dx) / zoom_scaling
+        theta_x = (-rotation_speed * dy) / zoom_scaling
 
         # Check if the cumulative rotation around x-axis is within the bounds of -80 and 80 degrees
         new_cum_theta_x = self.cum_theta_x + theta_x
@@ -232,7 +261,7 @@ class Icosphere:
         self.need_redraw = True  # Indicate that a redraw of the screen is needed, as it has been rotated.
 
     def zoom_in(self):
-        if self.scale * ZOOM_FACTOR <= MAX_SCALE:
+        if self.scale * ZOOM_FACTOR <= Icosphere.MAX_SCALE:
             self.scale *= ZOOM_FACTOR
             self.need_redraw = True
 
@@ -256,10 +285,34 @@ class Icosphere:
     def vertices_count(self):
         return len(self.vertices)
 
+    @property
+    def drawn_vertices_count(self):
+        """Returns the count of vertices being rendered on screen."""
+        count = 0
+        for vertex in self.vertices:
+            if vertex[2] > 0:
+                x, y = self.project(vertex)
+                if 0 <= x <= SCREEN_WIDTH and 0 <= y <= SCREEN_HEIGHT:
+                    count += 1
+        return count
+
     # Property to get the count of faces
     @property
     def faces_count(self):
         return len(self.faces)
+
+    @property
+    def drawn_faces_count(self):
+        """Returns the count of faces being rendered on screen."""
+        count = 0
+        for face in self.faces:
+            vertices_on_screen = [self.vertices[face[i]] for i in range(3) if
+                                  self.vertices[face[i]][2] > 0 and 0 <= self.project(self.vertices[face[i]])[
+                                      0] <= SCREEN_WIDTH and 0 <= self.project(self.vertices[face[i]])[
+                                      1] <= SCREEN_HEIGHT]
+            if len(vertices_on_screen) == 3:  # all 3 vertices of the face are on the screen
+                count += 1
+        return count
 
     # Property to get the current zoom level
     @property

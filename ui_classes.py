@@ -62,8 +62,10 @@ class DebugMenu:
             if self.active_tab == "Planet Info":
                 self.scroll_area.content = [
                     "Map Size: {}".format(globe.mapsize),
-                    "Vertices: {}".format(globe.vertices_count),
-                    "Faces: {}".format(globe.faces_count),
+                    "Total Vertices: {}".format(globe.vertices_count),
+                    "Total Faces: {}".format(globe.faces_count),
+                    "Vertices on Screen: {}".format(globe.drawn_vertices_count),
+                    "Faces on Screen: {}".format(globe.drawn_faces_count),
                     "Zoom: {:.2f}".format(globe.normalized_scale)
                 ]
                 self.scroll_area.draw(screen)
