@@ -79,7 +79,7 @@ class Icosphere:
 
         # Initial rotation to align the poles
         initial_theta_z = -np.pi / 6  # rotate by 30 degrees
-        self.vertices = self.rotate_vertices_z(self.vertices, initial_theta_z)
+        self.vertices = self.rotate_around_z(self.vertices, initial_theta_z)
 
         # Subdivision iterations
         self._subdivide(Icosphere.ITERATIONS[iteration_name])
@@ -95,6 +95,8 @@ class Icosphere:
 
     def _subdivide(self, iterations):
         for _ in range(iterations):
+            initial_vertex_count = len(self.vertices)
+
             new_faces = []
             for face in self.faces:
                 a = self.vertices[face[0]]
@@ -124,11 +126,11 @@ class Icosphere:
                 new_faces.append([face[2], ca_idx, bc_idx])
                 new_faces.append([ab_idx, bc_idx, ca_idx])
 
-            self.faces = np.array(new_faces)
-
-            # Normalize all vertices to ensure they are on teh sphere's surface
-            for i in range(len(self.vertices)):
+            # Normalize the original vertices to ensure they are on the sphere's surface
+            for i in range(initial_vertex_count):
                 self.vertices[i] = self.vertices[i] / np.linalg.norm(self.vertices[i])
+
+            self.faces = np.array(new_faces)
 
     def project(self, vertex):
         """
@@ -147,7 +149,7 @@ class Icosphere:
     # Function to rotate the icosphere around the z-axis (z is depth, in-to and out-of the screen)
     # This is only used to initially change the rotation of the planet so the poles are at the top and bottom.
     @staticmethod
-    def rotate_vertices_z(verts: np.ndarray, theta_z: float) -> np.ndarray:
+    def rotate_around_z(verts: np.ndarray, theta_z: float) -> np.ndarray:
         """
         Rotate the vertices around the z-axis.
 
@@ -169,7 +171,7 @@ class Icosphere:
 
     # Function to free rotate the icosphere around its polar axis, and to tilt it back and forth
     # We'll lock the tilting later to prevent anyone from flipping the planet upside down.
-    def rotate_vertices(self, loc_theta_y, loc_theta_x):
+    def rotate_around_x_and_y(self, loc_theta_y, loc_theta_x):
         """
         Rotate the vertices around both x and y-axis.
 
@@ -254,9 +256,9 @@ class Icosphere:
         new_cum_theta_x = self.cum_theta_x + theta_x
         if -np.pi / 180 * 80 <= new_cum_theta_x <= np.pi / 180 * 80:
             self.cum_theta_x = new_cum_theta_x
-            self.rotate_vertices(theta_y, theta_x)
+            self.rotate_around_x_and_y(theta_y, theta_x)
         else:
-            self.rotate_vertices(theta_y, 0)
+            self.rotate_around_x_and_y(theta_y, 0)
 
         self.need_redraw = True  # Indicate that a redraw of the screen is needed, as it has been rotated.
 
